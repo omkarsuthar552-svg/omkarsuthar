@@ -2,23 +2,32 @@
 <html lang="hi">
 <head>
     <meta charset="UTF-8">
-    <title>Omkar's Crazy World</title>
+    <title>Omkar's Sound Party!</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; transition: background 0.1s; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Comic Sans MS', cursive; transition: background 0.1s ease-out; }
         #gui { position: absolute; top: 20px; left: 20px; color: #fff; z-index: 10; pointer-events: none; }
-        .badge { background: linear-gradient(45deg, #ff00ff, #00ffff); padding: 10px 20px; border-radius: 50px; font-size: 20px; box-shadow: 0 0 20px #ff00ff; display: inline-block; margin-bottom: 10px; }
-        #msg { font-size: 18px; color: #ffff00; text-shadow: 2px 2px #000; }
-        video { position: absolute; bottom: 20px; right: 20px; width: 150px; border: 5px solid #fff; border-radius: 20px; transform: scaleX(-1); filter: hue-rotate(90deg); }
-        .emoji { position: absolute; font-size: 50px; pointer-events: none; animation: fall 2s linear forwards; }
+        .badge { background: linear-gradient(45deg, #ff00ff, #00ffff); padding: 10px 20px; border-radius: 50px; font-size: 24px; box-shadow: 0 0 25px #ff00ff; display: inline-block; margin-bottom: 10px; animation: pulse 1.5s infinite alternate; }
+        #msg { font-size: 20px; color: #ffff00; text-shadow: 2px 2px 5px #000; }
+        video { position: absolute; bottom: 20px; right: 20px; width: 160px; border: 5px solid #fff; border-radius: 25px; transform: scaleX(-1); filter: contrast(150%); }
+        .emoji { position: absolute; font-size: 60px; pointer-events: none; animation: fall 3s linear forwards; z-index: 1; opacity: 0.9; }
+        .sound-text { position: absolute; font-size: 40px; color: #fff; text-shadow: 2px 2px 5px #f00; z-index: 1000; animation: fadeUp 1s forwards; }
+
         @keyframes fall { to { transform: translateY(100vh) rotate(360deg); opacity: 0; } }
+        @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.05); } }
+        @keyframes fadeUp { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-50px); } }
     </style>
 </head>
 <body>
     <div id="gui">
-        <div class="badge">🔥 OMKAR BOSS 🔥</div><br>
-        <div id="msg">हाथ हिलाओ और जादू देखो!</div>
+        <div class="badge">🔊 OMKAR'S SOUND PARTY 🥳</div><br>
+        <div id="msg">कैमरा अनुमति दें और हाथ दिखाएं!</div>
     </div>
     <video id="video-input"></video>
+
+    <audio id="pop-sound" src="https://www.soundjay.com/buttons/sounds/button-10.mp3" preload="auto"></audio>
+    <audio id="boing-sound" src="https://www.soundjay.com/cartoon/sounds/boing-2.mp3" preload="auto"></audio>
+    <audio id="magic-chime" src="https://www.soundjay.com/misc/sounds/magic-chime-01.mp3" preload="auto"></audio>
+    <audio id="party-music" src="https://www.soundjay.com/music/sounds/childrens-party-music-01.mp3" preload="auto" loop></audio>
 
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -28,7 +37,15 @@
         const msgEl = document.getElementById('msg');
         const videoElement = document.getElementById('video-input');
         
-        // 1. Three.js Crazy Scene
+        const popSound = document.getElementById('pop-sound');
+        const boingSound = document.getElementById('boing-sound');
+        const magicChime = document.getElementById('magic-chime');
+        const partyMusic = document.getElementById('party-music');
+
+        let currentMesh, lastCount = -1;
+        let isPartyMode = false;
+
+        // 1. Three.js Scene Setup
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -36,64 +53,102 @@
         document.body.appendChild(renderer.domElement);
         camera.position.z = 40;
 
-        let funnyObject;
+        // 2. Funny Object Logic
         function createFunnyObject(type) {
-            if (funnyObject) scene.remove(funnyObject);
+            if (currentMesh) scene.remove(currentMesh);
             let geometry;
-            const material = new THREE.MeshPhongMaterial({ 
-                color: Math.random() * 0xffffff, 
-                wireframe: Math.random() > 0.5,
-                emissive: 0x111111
+            const material = new THREE.MeshNormalMaterial({ 
+                wireframe: Math.random() > 0.5 || isPartyMode,
+                transparent: true, opacity: 0.9
             });
             const light = new THREE.PointLight(0xffffff, 1, 100);
             scene.add(light);
 
-            if(type >= 5) {
-                geometry = new THREE.TorusKnotGeometry(10, 3, 100, 16);
-                spawnEmoji("🚀");
-            } else {
-                geometry = new THREE.IcosahedronGeometry(12, 0);
-            }
-            funnyObject = new THREE.Mesh(geometry, material);
-            scene.add(funnyObject);
+            const shapes = [
+                new THREE.BoxGeometry(15, 15, 15),
+                new THREE.SphereGeometry(12, 32, 32),
+                new THREE.ConeGeometry(10, 20, 32),
+                new THREE.TorusGeometry(10, 3, 16, 100),
+                new THREE.IcosahedronGeometry(15, 0),
+                new THREE.TorusKnotGeometry(12, 5, 200, 20)
+            ];
+
+            geometry = shapes[type % shapes.length];
+            
+            currentMesh = new THREE.Mesh(geometry, material);
+            scene.add(currentMesh);
         }
 
-        function spawnEmoji(char) {
+        // Helper to show text feedback for sounds
+        function showSoundText(text) {
+            const el = document.createElement('div');
+            el.className = 'sound-text';
+            el.innerText = text;
+            el.style.left = `${Math.random() * (window.innerWidth - 100)}px`;
+            el.style.top = `${Math.random() * (window.innerHeight - 100)}px`;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        }
+
+        function spawnEmoji(char = '🥳') {
             const e = document.createElement('div');
             e.className = 'emoji';
-            e.innerText = ['😂','😎','👻','🍕','🔥','💎'][Math.floor(Math.random()*6)];
+            e.innerText = ['😂','😎','👻','🍕','🔥','💎','🎶','🎉'][Math.floor(Math.random()*8)];
             e.style.left = Math.random() * 100 + "vw";
             e.style.top = "-50px";
             document.body.appendChild(e);
-            setTimeout(() => e.remove(), 2000);
+            setTimeout(() => e.remove(), 3000);
         }
 
         createFunnyObject(1);
 
-        // 2. Hand Logic
+        // 3. Hand Tracking with Audio and Visual Effects
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5 });
+        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
         hands.onResults((results) => {
-            if (results.multiHandLandmarks && results.multiHandLandmarks[0]) {
-                const landmarks = results.multiHandLandmarks[0];
-                funnyObject.position.x = (landmarks[9].x - 0.5) * -60;
-                funnyObject.position.y = (landmarks[9].y - 0.5) * -40;
-                
-                let fingers = 0;
-                results.multiHandLandmarks.forEach(h => {
-                    if(h[8].y < h[6].y) fingers++;
-                    if(h[12].y < h[10].y) fingers++;
-                    if(h[20].y < h[18].y) fingers++;
-                });
-
-                if(fingers > 5) {
-                    msgEl.innerText = "OMG! ओंकार भाई कंट्रोल करो! 🕺";
-                    document.body.style.background = `hsl(${Math.random() * 360}, 100%, 10%)`;
-                    spawnEmoji();
-                } else if (fingers > 0) {
-                    msgEl.innerText = "ये हुई ना बात! और उंगलियां दिखाओ... 😎";
+            msgEl.innerText = "ओंकार का जादू चालू है! 🎉";
+            let totalFingers = 0;
+            if (results.multiHandLandmarks) {
+                for (const landmarks of results.multiHandLandmarks) {
+                    if (landmarks[8].y < landmarks[6].y) totalFingers++; // Index
+                    if (landmarks[12].y < landmarks[10].y) totalFingers++; // Middle
+                    if (landmarks[16].y < landmarks[14].y) totalFingers++; // Ring
+                    if (landmarks[20].y < landmarks[18].y) totalFingers++; // Pinky
+                    if (Math.abs(landmarks[4].x - landmarks[20].x) > 0.1) totalFingers++; // Thumb
                 }
+
+                if (totalFingers !== lastCount) {
+                    createFunnyObject(totalFingers);
+                    if (totalFingers === 1) { popSound.play(); showSoundText("POP!"); }
+                    else if (totalFingers === 2) { boingSound.play(); showSoundText("BOING!"); }
+                    else if (totalFingers === 5) { magicChime.play(); showSoundText("MAGIC!"); }
+                    else if (totalFingers > 5) { 
+                        if(!isPartyMode) { partyMusic.play(); }
+                        isPartyMode = true;
+                        msgEl.innerText = "🔥🔥 100% DJ OMKAR ON FIRE! 🔥🔥";
+                        spawnEmoji(); 
+                    } else {
+                        isPartyMode = false;
+                        partyMusic.pause();
+                        partyMusic.currentTime = 0; // Reset music
+                        document.body.style.background = "#000";
+                    }
+                    lastCount = totalFingers;
+                }
+                
+                if(results.multiHandLandmarks[0]) {
+                    currentMesh.position.x = (results.multiHandHandedness[0].label === 'Left' ? -1 : 1) * (results.multiHandLandmarks[0][9].x - 0.5) * 60;
+                    currentMesh.position.y = (results.multiHandLandmarks[0][9].y - 0.5) * -40;
+                }
+            } else {
+                if(isPartyMode) { // Stop music if hands leave frame
+                    partyMusic.pause();
+                    partyMusic.currentTime = 0;
+                    isPartyMode = false;
+                    document.body.style.background = "#000";
+                }
+                msgEl.innerText = "कैमरा में हाथ दिखाएं... 🧐";
             }
         });
 
@@ -105,9 +160,12 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            if(funnyObject) {
-                funnyObject.rotation.x += 0.05;
-                funnyObject.rotation.y += 0.05;
+            if (currentMesh) {
+                currentMesh.rotation.x += isPartyMode ? 0.08 : 0.02;
+                currentMesh.rotation.y += isPartyMode ? 0.08 : 0.02;
+            }
+            if(isPartyMode) {
+                document.body.style.background = `hsl(${Math.random() * 360}, 80%, 30%)`;
             }
             renderer.render(scene, camera);
         }
