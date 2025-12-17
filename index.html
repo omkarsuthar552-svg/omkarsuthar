@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Magic Hand Tracker</title>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; color: #0f0; }
+        #status { position: absolute; top: 20px; left: 20px; z-index: 100; font-family: monospace; background: rgba(0,0,0,0.7); padding: 10px; border: 1px solid #0f0; }
+        video { position: absolute; bottom: 10px; right: 10px; width: 150px; border: 2px solid #0f0; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <div id="status">STATUS: INITIALIZING... (Please Allow Camera)</div>
+    <video id="video-input"></video>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+    <script>
+        const status = document.getElementById('status');
+        const videoElement = document.getElementById('video-input');
+
+        // Three.js Scene Setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const geometry = new THREE.TorusKnotGeometry(10, 3, 100, 16);
+        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
+        const shape = new THREE.Mesh(geometry, material);
+        scene.add(shape);
+        camera.position.z = 30;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            shape.rotation.x += 0.01;
+            shape.rotation.y += 0.01;
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Hands Tracking
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5 });
+        
+        hands.onResults((results) => {
+            status.innerText = "SYSTEM ACTIVE: Tracking Hand...";
+            if (results.multiHandLandmarks && results.multiHandLandmarks[0]) {
+                const landmark = results.multiHandLandmarks[0][9]; // Middle of hand
+                shape.position.x = (landmark.x - 0.5) * -50;
+                shape.position.y = (landmark.y - 0.5) * -30;
+            }
+        });
+
+        const cam = new Camera(videoElement, {
+            onFrame: async () => { await hands.send({image: videoElement}); },
+            width: 640, height: 480
+        });
+        
+        cam.start().catch(() => { status.innerText = "ERROR: Camera Blocked!"; });
+    </script>
+</body>
+</html>
