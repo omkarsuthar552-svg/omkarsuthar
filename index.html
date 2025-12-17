@@ -1,16 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hi">
 <head>
     <meta charset="UTF-8">
-    <title>Magic Hand Tracker</title>
+    <title>Omkar's Magic Shapes</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; color: #0f0; }
-        #status { position: absolute; top: 20px; left: 20px; z-index: 100; font-family: monospace; background: rgba(0,0,0,0.7); padding: 10px; border: 1px solid #0f0; }
-        video { position: absolute; bottom: 10px; right: 10px; width: 150px; border: 2px solid #0f0; border-radius: 10px; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+        #info { position: absolute; top: 20px; left: 20px; color: #00ffcc; z-index: 10; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 10px; border: 1px solid #00ffcc; line-height: 1.6; }
+        video { position: absolute; bottom: 20px; right: 20px; width: 180px; border: 2px solid #00ffcc; border-radius: 10px; transform: scaleX(-1); }
+        .highlight { color: #fff; font-weight: bold; text-shadow: 0 0 10px #00ffcc; }
     </style>
 </head>
 <body>
-    <div id="status">STATUS: INITIALIZING... (Please Allow Camera)</div>
+    <div id="info">
+        <div class="highlight" style="font-size: 1.5em; margin-bottom: 5px;">OMKAR'S MAGIC WORLD</div>
+        STATUS: <span id="status">INITIALIZING...</span><br>
+        SHAPE: <span id="current-shape" class="highlight">Sphere</span><br>
+        CONTROLS: Show 1-10 Fingers to Change Shapes
+    </div>
     <video id="video-input"></video>
 
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
@@ -18,40 +24,76 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
     <script>
-        const status = document.getElementById('status');
+        const statusEl = document.getElementById('status');
+        const shapeEl = document.getElementById('current-shape');
         const videoElement = document.getElementById('video-input');
 
-        // Three.js Scene Setup
+        // 1. Three.js Scene Setup
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        const geometry = new THREE.TorusKnotGeometry(10, 3, 100, 16);
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
-        const shape = new THREE.Mesh(geometry, material);
-        scene.add(shape);
-        camera.position.z = 30;
+        let currentMesh;
+        camera.position.z = 35;
 
-        function animate() {
-            requestAnimationFrame(animate);
-            shape.rotation.x += 0.01;
-            shape.rotation.y += 0.01;
-            renderer.render(scene, camera);
+        // 2. Function to Create 10 different shapes + OMKAR text
+        function createShape(type) {
+            if (currentMesh) scene.remove(currentMesh);
+            
+            let geometry;
+            const material = new THREE.MeshNormalMaterial({ wireframe: true });
+
+            switch(type) {
+                case 1: geometry = new THREE.SphereGeometry(10, 32, 32); shapeEl.innerText = "1. Sphere"; break;
+                case 2: geometry = new THREE.BoxGeometry(15, 15, 15); shapeEl.innerText = "2. Cube"; break;
+                case 3: geometry = new THREE.TorusGeometry(10, 3, 16, 100); shapeEl.innerText = "3. Donut"; break;
+                case 4: geometry = new THREE.OctahedronGeometry(12); shapeEl.innerText = "4. Diamond"; break;
+                case 5: geometry = new THREE.ConeGeometry(10, 20, 32); shapeEl.innerText = "5. Cone"; break;
+                case 6: geometry = new THREE.IcosahedronGeometry(12); shapeEl.innerText = "6. Crystal"; break;
+                case 7: geometry = new THREE.TorusKnotGeometry(8, 3, 100, 16); shapeEl.innerText = "7. Knot"; break;
+                case 8: geometry = new THREE.CylinderGeometry(8, 8, 20, 32); shapeEl.innerText = "8. Cylinder"; break;
+                case 9: geometry = new THREE.DodecahedronGeometry(12); shapeEl.innerText = "9. Multi-Face"; break;
+                case 10: geometry = new THREE.TetrahedronGeometry(15); shapeEl.innerText = "10. Pyramid"; break;
+                case 'omkar': 
+                    // Simple "O" shape representation for OMKAR text
+                    geometry = new THREE.TorusGeometry(12, 1, 16, 100); 
+                    shapeEl.innerText = "WELCOME OMKAR!";
+                    break;
+                default: geometry = new THREE.SphereGeometry(10, 32, 32);
+            }
+
+            currentMesh = new THREE.Mesh(geometry, material);
+            scene.add(currentMesh);
         }
-        animate();
 
-        // Hands Tracking
+        createShape(1); // Default shape
+
+        // 3. Hand Tracking Logic
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5 });
-        
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
+
         hands.onResults((results) => {
-            status.innerText = "SYSTEM ACTIVE: Tracking Hand...";
+            statusEl.innerText = "SYSTEM ONLINE ✅";
             if (results.multiHandLandmarks && results.multiHandLandmarks[0]) {
-                const landmark = results.multiHandLandmarks[0][9]; // Middle of hand
-                shape.position.x = (landmark.x - 0.5) * -50;
-                shape.position.y = (landmark.y - 0.5) * -30;
+                const landmarks = results.multiHandLandmarks[0];
+                
+                // Position Control
+                currentMesh.position.x = (landmarks[9].x - 0.5) * -50;
+                currentMesh.position.y = (landmarks[9].y - 0.5) * -30;
+
+                // Finger Counting
+                const fingerTips = [8, 12, 16, 20];
+                let count = 0;
+                if(landmarks[4].x > landmarks[3].x) count++; // Thumb
+                fingerTips.forEach(tip => {
+                    if(landmarks[tip].y < landmarks[tip-2].y) count++;
+                });
+
+                if(count > 0 && count <= 10) {
+                    createShape(count);
+                }
             }
         });
 
@@ -59,8 +101,24 @@
             onFrame: async () => { await hands.send({image: videoElement}); },
             width: 640, height: 480
         });
-        
-        cam.start().catch(() => { status.innerText = "ERROR: Camera Blocked!"; });
+        cam.start();
+
+        // 4. Animation Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            if (currentMesh) {
+                currentMesh.rotation.x += 0.01;
+                currentMesh.rotation.y += 0.01;
+            }
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
     </script>
 </body>
 </html>
