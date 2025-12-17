@@ -2,19 +2,21 @@
 <html lang="hi">
 <head>
     <meta charset="UTF-8">
-    <title>Omkar's 10 Shapes Magic</title>
+    <title>Omkar's Crazy World</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
-        #info { position: absolute; top: 20px; left: 20px; color: #00ffcc; z-index: 10; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 10px; border: 1px solid #00ffcc; }
-        video { position: absolute; bottom: 20px; right: 20px; width: 180px; border: 2px solid #00ffcc; border-radius: 10px; transform: scaleX(-1); }
-        .highlight { color: #fff; font-weight: bold; text-shadow: 0 0 10px #00ffcc; font-size: 1.2em; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; transition: background 0.1s; }
+        #gui { position: absolute; top: 20px; left: 20px; color: #fff; z-index: 10; pointer-events: none; }
+        .badge { background: linear-gradient(45deg, #ff00ff, #00ffff); padding: 10px 20px; border-radius: 50px; font-size: 20px; box-shadow: 0 0 20px #ff00ff; display: inline-block; margin-bottom: 10px; }
+        #msg { font-size: 18px; color: #ffff00; text-shadow: 2px 2px #000; }
+        video { position: absolute; bottom: 20px; right: 20px; width: 150px; border: 5px solid #fff; border-radius: 20px; transform: scaleX(-1); filter: hue-rotate(90deg); }
+        .emoji { position: absolute; font-size: 50px; pointer-events: none; animation: fall 2s linear forwards; }
+        @keyframes fall { to { transform: translateY(100vh) rotate(360deg); opacity: 0; } }
     </style>
 </head>
 <body>
-    <div id="info">
-        <div style="font-size: 1.5em; color: #fff;">OMKAR'S MAGIC WORLD</div>
-        उंगलियां दिखाएं (1-10): <span id="finger-count" class="highlight">0</span><br>
-        आकार (Shape): <span id="current-shape" class="highlight">Sphere</span>
+    <div id="gui">
+        <div class="badge">🔥 OMKAR BOSS 🔥</div><br>
+        <div id="msg">हाथ हिलाओ और जादू देखो!</div>
     </div>
     <video id="video-input"></video>
 
@@ -23,85 +25,74 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
     <script>
-        const shapeEl = document.getElementById('current-shape');
-        const countEl = document.getElementById('finger-count');
+        const msgEl = document.getElementById('msg');
         const videoElement = document.getElementById('video-input');
-        let currentMesh, lastCount = -1;
-
-        // 1. Scene Setup
+        
+        // 1. Three.js Crazy Scene
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
-        camera.position.z = 35;
+        camera.position.z = 40;
 
-        // 2. 10 Shapes Logic
-        function createShape(type) {
-            if (currentMesh) scene.remove(currentMesh);
+        let funnyObject;
+        function createFunnyObject(type) {
+            if (funnyObject) scene.remove(funnyObject);
             let geometry;
-            const material = new THREE.MeshNormalMaterial({ wireframe: true });
+            const material = new THREE.MeshPhongMaterial({ 
+                color: Math.random() * 0xffffff, 
+                wireframe: Math.random() > 0.5,
+                emissive: 0x111111
+            });
+            const light = new THREE.PointLight(0xffffff, 1, 100);
+            scene.add(light);
 
-            const shapes = {
-                1: [new THREE.SphereGeometry(10, 32, 32), "Sphere"],
-                2: [new THREE.BoxGeometry(15, 15, 15), "Cube"],
-                3: [new THREE.TorusGeometry(10, 3, 16, 100), "Donut"],
-                4: [new THREE.OctahedronGeometry(12), "Diamond"],
-                5: [new THREE.ConeGeometry(10, 20, 32), "Cone"],
-                6: [new THREE.IcosahedronGeometry(12), "Crystal"],
-                7: [new THREE.TorusKnotGeometry(8, 3, 100, 16), "Knot"],
-                8: [new THREE.CylinderGeometry(8, 8, 20, 32), "Cylinder"],
-                9: [new THREE.DodecahedronGeometry(12), "Multi-Face"],
-                10: [new THREE.TetrahedronGeometry(15), "Pyramid"]
-            };
-
-            const selected = shapes[type] || shapes[1];
-            geometry = selected[0];
-            shapeEl.innerText = selected[1];
-            
-            currentMesh = new THREE.Mesh(geometry, material);
-            scene.add(currentMesh);
+            if(type >= 5) {
+                geometry = new THREE.TorusKnotGeometry(10, 3, 100, 16);
+                spawnEmoji("🚀");
+            } else {
+                geometry = new THREE.IcosahedronGeometry(12, 0);
+            }
+            funnyObject = new THREE.Mesh(geometry, material);
+            scene.add(funnyObject);
         }
-        createShape(1);
 
-        // 3. Dual Hand Tracking (6-10 Fingers)
+        function spawnEmoji(char) {
+            const e = document.createElement('div');
+            e.className = 'emoji';
+            e.innerText = ['😂','😎','👻','🍕','🔥','💎'][Math.floor(Math.random()*6)];
+            e.style.left = Math.random() * 100 + "vw";
+            e.style.top = "-50px";
+            document.body.appendChild(e);
+            setTimeout(() => e.remove(), 2000);
+        }
+
+        createFunnyObject(1);
+
+        // 2. Hand Logic
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ 
-            maxNumHands: 2, // अब यह 2 हाथ पहचानेगा
-            modelComplexity: 1, 
-            minDetectionConfidence: 0.6, 
-            minTrackingConfidence: 0.6 
-        });
+        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5 });
 
         hands.onResults((results) => {
-            let totalFingers = 0;
-
-            if (results.multiHandLandmarks) {
-                for (const landmarks of results.multiHandLandmarks) {
-                    // Thumb logic
-                    const isLeftHand = landmarks[4].x > landmarks[20].x;
-                    if (isLeftHand) {
-                        if (landmarks[4].x > landmarks[3].x) totalFingers++;
-                    } else {
-                        if (landmarks[4].x < landmarks[3].x) totalFingers++;
-                    }
-                    // 4 Fingers logic
-                    if (landmarks[8].y < landmarks[6].y) totalFingers++;
-                    if (landmarks[12].y < landmarks[10].y) totalFingers++;
-                    if (landmarks[16].y < landmarks[14].y) totalFingers++;
-                    if (landmarks[20].y < landmarks[18].y) totalFingers++;
-                }
-
-                if (totalFingers > 0 && totalFingers !== lastCount) {
-                    countEl.innerText = totalFingers;
-                    createShape(totalFingers);
-                    lastCount = totalFingers;
-                }
+            if (results.multiHandLandmarks && results.multiHandLandmarks[0]) {
+                const landmarks = results.multiHandLandmarks[0];
+                funnyObject.position.x = (landmarks[9].x - 0.5) * -60;
+                funnyObject.position.y = (landmarks[9].y - 0.5) * -40;
                 
-                // Position follow the first hand
-                if(results.multiHandLandmarks[0]) {
-                    currentMesh.position.x = (results.multiHandLandmarks[0][9].x - 0.5) * -50;
-                    currentMesh.position.y = (results.multiHandLandmarks[0][9].y - 0.5) * -30;
+                let fingers = 0;
+                results.multiHandLandmarks.forEach(h => {
+                    if(h[8].y < h[6].y) fingers++;
+                    if(h[12].y < h[10].y) fingers++;
+                    if(h[20].y < h[18].y) fingers++;
+                });
+
+                if(fingers > 5) {
+                    msgEl.innerText = "OMG! ओंकार भाई कंट्रोल करो! 🕺";
+                    document.body.style.background = `hsl(${Math.random() * 360}, 100%, 10%)`;
+                    spawnEmoji();
+                } else if (fingers > 0) {
+                    msgEl.innerText = "ये हुई ना बात! और उंगलियां दिखाओ... 😎";
                 }
             }
         });
@@ -114,9 +105,9 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            if (currentMesh) {
-                currentMesh.rotation.x += 0.01;
-                currentMesh.rotation.y += 0.01;
+            if(funnyObject) {
+                funnyObject.rotation.x += 0.05;
+                funnyObject.rotation.y += 0.05;
             }
             renderer.render(scene, camera);
         }
